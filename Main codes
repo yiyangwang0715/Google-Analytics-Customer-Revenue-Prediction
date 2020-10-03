@@ -1,0 +1,256 @@
+#import data into a data frame object
+setwd("C:/Users/Grace/graduate/Spring2019/BUNK776 Action Learning Project/data")
+train <- read.csv("train_clean.csv", header = T, stringsAsFactors = F)
+
+
+#delete duplicate sessionId:
+library(tidyverse)
+library(plyr)
+num <- count(train, vars = "sessionId")
+train <- train %>% inner_join(num, by = "sessionId")
+train <- train %>% 
+  filter(freq == 1) %>%
+  subset(select = -freq)
+
+#recoding 'not set'/'not available' to NA or 0(for dummy variables)
+train$continent <- ifelse(train$continent == "(not set)", NA , train$continent)
+
+train$subContinent <- ifelse(train$subContinent == "(not set)", NA , train$subContinent)
+
+train$country <- ifelse(train$country == "(not set)", NA , train$country)
+
+train$metro <- ifelse(train$metro %in% c("(not set)","not available in demo dataset"), NA , train$metro)
+
+train$city <- ifelse(train$city %in% c("(not set)","not available in demo dataset"), NA , train$city)
+
+train$region <- ifelse(train$region %in% c("(not set)","not available in demo dataset"), NA, train$region)
+
+train$transactionRevenue <- ifelse(is.na(train$transactionRevenue) == 1, 0, train$transactionRevenue)
+
+train$campaign <- ifelse(train$campaign == '(not set)', 0, 1)
+
+train$isTrueDirect <- ifelse(is.na(train$isTrueDirect) ==1, 0, 1 )
+
+train$log_revenue <- ifelse(is.na(train$log_revenue) == 1, 0, train$log_revenue)
+
+train$is.rev <- ifelse(train$log_revenue >0, 1,0)
+
+train$pageviews <- 
+  case_when(is.na(train$pageviews) == TRUE ~ 0,
+            TRUE ~ as.numeric(train$pageviews))
+
+train$bounces <- 
+  case_when(is.na(train$bounces) == TRUE ~ 0,
+            TRUE ~ as.numeric(train$bounces))
+train$newVisits <- 
+  case_when(is.na(train$newVisits) == TRUE ~ 0,
+            TRUE ~ as.numeric(train$newVisits))
+
+#delete unnecessary variables
+train <- subset(train, select = -c(date,adContent, keyword, source, referralPath, lon, lat,
+                                   log_revenue_dum, networkDomain, X, X.1,is.Mobile))
+
+#keep observation with no bounces
+train <- train %>%
+  filter(bounces == 0)
+
+#keep observation with continent information
+train <- train %>% 
+  filter(is.na(train$continent)==0)
+
+#Combining rare levels into ‘others’
+library(data.table)
+train <- as.data.table(train)
+train[,subContinent := ifelse(.N < 10000, "others",as.character(subContinent)), by = subContinent]
+train[,operatingSystem := ifelse(.N < 8000, "others",as.character(operatingSystem)), by = operatingSystem]
+##browser
+train$browser <- 
+  case_when(train$browser == 'Safari (in-app)' ~ 'Safari',
+            TRUE ~ as.character(train$browser))
+train$browser <- 
+  case_when(train$browser == 'Opera Mini' ~ 'Opera',
+            TRUE ~ as.character(train$browser))
+train[,browser := ifelse(.N < 1000, "others",as.character(browser)), by = browser]
+train[,country := ifelse(.N < 4000, "others",as.character(country)), by = country]
+train$region <- ifelse(train$region %in% c("(not set)"), NA , train$region)
+train[,region := ifelse(.N < 2400, "others",as.character(region)), by = region]
+train[,city := ifelse(.N < 3500, "others",as.character(city)), by = city]
+
+#dummy coding:
+#channelgrouping
+train$organic_search <- ifelse(train[,1] == "Organic Search", 1,0)
+train$paid_search <- ifelse(train[,1] == "Paid Search", 1,0)
+train$referral <- ifelse(train[,1] == "Referral", 1,0)
+train$social <- ifelse(train[,1] == "Social", 1,0)
+train$display <- ifelse(train[,1] == "Display", 1,0)
+train$direct <- ifelse(train[,1] == "Direct", 1,0)
+train$affiliates <- ifelse(train[,1] == "Affiliates", 1,0)
+train$other <- ifelse(train[,1] == '(Other)', 1,0)
+
+#operatingsystem
+train$o.android <- ifelse(train[,"operatingSystem"]=='Android',1,0)
+train$o.chrome.os <- ifelse(train[,"operatingSystem"]=='Chrome OS',1,0)
+train$o.ios <- ifelse(train[,"operatingSystem"]=='iOS',1,0)
+train$o.linux <- ifelse(train[,"operatingSystem"]=='Linux',1,0)
+train$o.macintosh <- ifelse(train[,"operatingSystem"]=='Macintosh',1,0)
+train$o.windows <- ifelse(train[,"operatingSystem"]=='Windows',1,0)
+train$o.other <- ifelse(train[,"operatingSystem"]=='other',1,0)
+
+#browser:
+train$b.chrome <- ifelse(train[,'browser']=='Chrome',1,0)
+train$b.safari <- ifelse(train[,'browser']=='Safari',1,0)
+train$b.firefox <- ifelse(train[,'browser']=='Firefox',1,0)
+train$b.inexplorer <- ifelse(train[,'browser']=='Internet Explorer',1,0)
+
+train$b.opera <- ifelse(train[,'browser']=='Opera',1,0)
+train$b.edge <- ifelse(train[,'browser']=='Edge',1,0)
+train$b.anwebview <- ifelse(train[,'browser']=='Android Webview',1,0)
+train$b.ucbrowser <- ifelse(train[,'browser']=='UC Browser',1,0)
+train$b.other <- ifelse(train[,'browser']=='other',1,0)
+
+#continent
+train$asia <- ifelse(train[,'continent']=='Asia',1,0)
+train$africa <- ifelse(train[,'continent']=='Africa',1,0)
+train$americas <- ifelse(train[,'continent']=='Americas',1,0)
+train$oceania <- ifelse(train[,'continent']=='Oceania',1,0)
+train$europe <- ifelse(train[,'continent']=='Europe',1,0)
+train$na <- ifelse(is.na(train[,'continent']),1,0)
+
+#subcontinent:
+##subContinent
+train$s.esternasia<-ifelse(train[,'subContinent'] == 'Eastern Asia',1,0)
+train$s.northamerica<-ifelse(train[,'subContinent'] == 'Northern America',1,0)
+train$s.northeurope<-ifelse(train[,'subContinent'] == 'Northern Europe',1,0)
+train$s.others<-ifelse(train[,'subContinent'] == 'others',1,0)
+train$s.southeastasia <- ifelse(train[,'subContinent'] == 'Southeast Asia',1,0)
+train$s.southernasia <- ifelse(train[,'subContinent'] == 'Southern Asia',1,0)
+train$s.westerneurope <- ifelse(train[,'subContinent'] == 'Western Europe',1,0)
+
+
+#region
+train$r.na<-ifelse(train[,'city'] == 11,1,0)
+train$r.California<- ifelse(train[,'region'] == 'California',1,0)
+train$r.NewYork<- ifelse(train[,'region'] == 'New York',1,0)
+train$r.Others<- ifelse(train[,'region'] == 'others',1,0)
+train$r.Texas<- ifelse(train[,'region'] == 'Texas',1,0)
+train$r.England<- ifelse(train[,'region'] == 'England',1,0)
+#train$r.Illinois <- ifelse(train[,'region'] == 'Illinois',1,0)
+#train$r.Washington <- ifelse(train[,'region'] == 'Washington',1,0)
+
+
+#city:
+train$city.na<-ifelse(train[,'city'] == 11,1,0)
+train$c.mountainView<-ifelse(train[,'city'] == 'Mountain View',1,0)
+train$c.newYork<-ifelse(train[,'city'] == 'New York',1,0)
+train$c.others<-ifelse(train[,'city'] == 'others',1,0)
+train$c.sanfrancisco<-ifelse(train[,'city'] == 'San Francisco',1,0)
+train$c.sanJose<-ifelse(train[,'city'] == 'San Jose',1,0)
+train$c.sunnyvale<-ifelse(train[,'city'] == 'Sunnyvale',1,0)
+                                
+
+#device
+train$mobile <- ifelse(train[,'deviceCategory']=='mobile',1,0)
+train$tablet <- ifelse(train[,'deviceCategory']=='tablet',1,0)
+train$desktop <- ifelse(train[,'deviceCategory']=='desktop',1,0)
+
+#import converted time
+time <- read.csv("weekdummy.csv", header = T, stringsAsFactors = F)
+library(sqldf)
+train2 <- sqldf('select * from train inner join time on train.sessionId = time.sessionId')
+train2 <- subset(train2, select = -c(X, weekday, regu_date))
+train2 <- subset(train2, select = -c(sessionId.1))
+time2 <- read.csv("train0225.csv", header = T, stringsAsFactors = F)
+time2 <- subset(time2, select = c(sessionId, Time_of_day))
+train3 <- sqldf('select * from train2 inner join time2 on train2.sessionId = time2.sessionId')
+
+#time
+train3$Time_of_day <- ifelse(is.na(train3$Time_of_day)==1,11,train3$Time_of_day)
+train3$t.na<-ifelse(train3[,'Time_of_day'] == 11,1,0)
+train3$t.afternoon<-ifelse(train3[,'Time_of_day'] == 'Afternoon',1,0)
+train3$t.morning<-ifelse(train3[,'Time_of_day'] == 'Morning',1,0)
+train3$t.evening<-ifelse(train3[,'Time_of_day'] == 'Evening',1,0)
+train3$t.night<-ifelse(train3[,'Time_of_day'] == 'Night',1,0)
+
+
+
+#change all dummy variables into factors
+names<-c(21:75)
+train[ ,names]<-lapply(train[ ,names],factor)
+train$metro_dum<-as.factor(train$metro_dum)
+train$newVisits<-as.factor(train$newVisits)
+
+
+#sampling:
+set.seed(12)
+train.index <- sample(1:nrow(train), floor(0.75*nrow(train)), replace = F)
+
+# split the data into train and test
+my.train <- train[train.index,]
+my.test <- train[-train.index,]
+
+write_csv(my.train,'my.train.csv')
+write_csv(my.test,'my.test.csv')
+
+
+
+#logistic regression model-rmse 0.14xx
+mymodel <- glm(is.rev ~ pageviews   +  newVisits   +  visitNumber    + 
+                 metro_dum  +
+                 paid_search +   referral   +   social  +  display   + affiliates + direct      
+               + o.android      + o.ios  +    o.linux     +  o.macintosh + 
+                 africa + americas + europe + oceania +
+                 b.android + b.safari + b.chrome + b.explorer  +  b.edge    +   b.android + b.opera 
+               +t.morning    + t.afternoon   +  t.night + t.na, data=my.train, 
+               family = 'binomial')
+
+train$p1 <- predict(mymodel, train, type = 'response')
+summary(train$p1)
+head(train)
+rmse(train$is.rev,train$p1)
+
+
+#semi-log model
+setwd("C:\\Users\\eyon0\\OneDrive\\桌面\\BUMK776")
+my.train<-read.csv("bigheadshrimp.csv", stringsAsFactors = FALSE)
+
+my.train<-my.train %>%
+  filter( is.rev == 1)
+
+model3<- lm(log_revenue  ~    pageviews   +  newVisits   +  visitNumber    + 
+              metro_dum  +
+              paid_search +   referral   +   social  +  display   + affiliates + direct      
+            + o.android      + o.ios  +    o.linux     +  o.macintosh +
+              b.android + b.safari + b.chrome + b.explorer  +  b.edge    +   b.android + b.opera +   
+              t.morning    + t.afternoon   +  t.night + t.na+  africa + americas + europe + oceania
+            ,data=my.train)
+
+cutoff <- 4/(nrow(mysample)-length(model1$coefficients)-2)
+plot(model1,which=4,cook.levels=cutoff)
+plot(model1,which=5,cook.levels=cutoff)
+mysample<-mysample[-which(rownames(mysample)%in% c('513','3129')),]
+mysample<-mysample[-which(rownames(mysample)%in% c('1272')),]
+mysample<-mysample[-which(rownames(mysample)%in% c('246')),]
+
+
+summary(model3)
+sd(my.train$log_revenue)
+fit<-predict(model3,my.train)
+my.train$predict<-fit
+library(Metrics)
+rmse(my.train$log_revenue,fit)
+
+#rmse of training model is 1.09 ,sd is 1.21
+my.test$predrev<-predict(model3,my.test)
+rmse(my.test$log_revenue,my.test$predrev*my.test$p2)
+sd(my.test$log_revenue)
+
+#test rmse 2.49 sd2.77 - on session-level
+
+
+
+my.test2<-separate(data=my.test,col = sessionId,
+               into = c('User','session'),sep="_")
+aggr1<-rbind(aggr1,bou)
+
+#we use the unique identifier to aggregate predicted revenue from session level to user level.
+results1<-aggregate(my.test2$final6, by=list(User=my.test2$User), FUN=sum)
